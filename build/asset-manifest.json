@@ -1,14 +1,14 @@
 {
-  "main.js": "/static/js/main.3777391b.chunk.js",
-  "main.js.map": "/static/js/main.3777391b.chunk.js.map",
-  "runtime~main.js": "/static/js/runtime~main.1b922744.js",
-  "runtime~main.js.map": "/static/js/runtime~main.1b922744.js.map",
-  "vendors~main.js": "/static/js/vendors~main.0b49ec49.chunk.js",
-  "vendors~main.js.map": "/static/js/vendors~main.0b49ec49.chunk.js.map",
-  "./service-worker.js": "/./service-worker.js",
-  "favicon.ico": "/favicon.ico",
-  "index.html": "/index.html",
-  "logo.svg": "/logo.svg",
-  "manifest.json": "/manifest.json",
-  "precache-manifest.f75ac7e51fab08f8fddefe4044984192.js": "/precache-manifest.f75ac7e51fab08f8fddefe4044984192.js"
+  "main.js": "/elm-calculator/static/js/main.3777391b.chunk.js",
+  "main.js.map": "/elm-calculator/static/js/main.3777391b.chunk.js.map",
+  "runtime~main.js": "/elm-calculator/static/js/runtime~main.830ee8fe.js",
+  "runtime~main.js.map": "/elm-calculator/static/js/runtime~main.830ee8fe.js.map",
+  "vendors~main.js": "/elm-calculator/static/js/vendors~main.0b49ec49.chunk.js",
+  "vendors~main.js.map": "/elm-calculator/static/js/vendors~main.0b49ec49.chunk.js.map",
+  "./service-worker.js": "/elm-calculator/./service-worker.js",
+  "favicon.ico": "/elm-calculator/favicon.ico",
+  "index.html": "/elm-calculator/index.html",
+  "logo.svg": "/elm-calculator/logo.svg",
+  "manifest.json": "/elm-calculator/manifest.json",
+  "precache-manifest.67fa4b70eda572ae91ae75e1cc9408ec.js": "/elm-calculator/precache-manifest.67fa4b70eda572ae91ae75e1cc9408ec.js"
 }
