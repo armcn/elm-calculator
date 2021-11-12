@@ -9,7 +9,6 @@ import Element.Events exposing (..)
 import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html)
-import Html.Attributes
 import Icons
 import Svg exposing (Svg)
 import Svg.Attributes
