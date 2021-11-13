@@ -4,20 +4,16 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/elm-calculator/favicon.ico"
   },
   {
-    "revision": "171080e81843f48067c9f7d73a5c3c29",
+    "revision": "0c61cd51013dea91e1627cfc944c31ea",
     "url": "/elm-calculator/index.html"
-  },
-  {
-    "revision": "6ead519905b7b907c00965be37dd5cd7",
-    "url": "/elm-calculator/logo.svg"
   },
   {
     "revision": "1c82903c2994c2507b385b9042bbfac5",
     "url": "/elm-calculator/manifest.json"
   },
   {
-    "revision": "3777391b8beeeb0dfc18",
-    "url": "/elm-calculator/static/js/main.3777391b.chunk.js"
+    "revision": "ea8d01f7328fcf76a485",
+    "url": "/elm-calculator/static/js/main.ea8d01f7.chunk.js"
   },
   {
     "revision": "830ee8fe30f0dc9aac40",
