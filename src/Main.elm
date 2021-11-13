@@ -19,21 +19,6 @@ import VirtualDom
 ---- MODEL ----
 
 
-type alias Model =
-    { screenSize : ScreenSize
-    , button : Button
-    , inputs : List String
-    , lastValue : String
-    , currentValue : String
-    , result : Float
-    , operation : Float -> Float -> Float
-    , lastValueNumber : Bool
-    , append : Bool
-    , decimal : Bool
-    , cleared : Bool
-    }
-
-
 type alias ScreenSize =
     { width : Int
     , height : Int
@@ -43,6 +28,20 @@ type alias ScreenSize =
 type alias Button =
     { id : String
     , pressed : Bool
+    }
+
+
+type alias Model =
+    { screenSize : ScreenSize
+    , button : Button
+    , inputs : List String
+    , lastValue : String
+    , currentValue : String
+    , operation : Float -> Float -> Float
+    , result : Float
+    , append : Bool
+    , decimal : Bool
+    , cleared : Bool
     }
 
 
@@ -57,17 +56,21 @@ init flags =
     ( { screenSize = ScreenSize flags.width flags.height
       , button = Button "" False
       , inputs = []
-      , currentValue = "0"
       , lastValue = ""
+      , currentValue = "0"
+      , operation = defaultOperation
       , result = 0
-      , operation = \_ y -> y
-      , lastValueNumber = False
       , append = False
       , decimal = False
       , cleared = True
       }
     , Cmd.none
     )
+
+
+defaultOperation : Float -> Float -> Float
+defaultOperation _ b =
+    b
 
 
 
@@ -94,28 +97,28 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     ( case msg of
         SetScreenSize width height ->
-            setScreenSize model width height
+            setScreenSize width height model
 
-        PressButton text ->
-            pressButton model text
+        PressButton id ->
+            pressButton id model
 
-        UnpressButton text ->
-            unpressButton model text
+        UnpressButton id ->
+            unpressButton id model
 
         Number number ->
-            updateCurrentValue model number
+            updateNumbers number model
 
         Add ->
-            addOperation model
+            add model
 
         Subtract ->
-            subtractOperation model
+            subtract model
 
         Multiply ->
-            multiplyOperation model
+            multiply model
 
         Divide ->
-            divideOperation model
+            divide model
 
         Decimal ->
             decimal model
@@ -135,187 +138,184 @@ update msg model =
     )
 
 
-setScreenSize : Model -> Int -> Int -> Model
-setScreenSize model width height =
+setScreenSize : Int -> Int -> Model -> Model
+setScreenSize width height model =
     { model | screenSize = ScreenSize width height }
 
 
-pressButton : Model -> String -> Model
-pressButton model text =
-    { model | button = Button text True }
+pressButton : String -> Model -> Model
+pressButton id model =
+    { model | button = Button id True }
 
 
-unpressButton : Model -> String -> Model
-unpressButton model text =
-    { model | button = Button text False }
+unpressButton : String -> Model -> Model
+unpressButton id model =
+    { model | button = Button id False }
 
 
-addOperation : Model -> Model
-addOperation =
-    inputOperation "+" add
-
-
-subtractOperation : Model -> Model
-subtractOperation =
-    inputOperation "-" subtract
-
-
-multiplyOperation : Model -> Model
-multiplyOperation =
-    inputOperation "x" multiply
-
-
-divideOperation : Model -> Model
-divideOperation =
-    inputOperation "/" divide
-
-
-inputOperation : String -> (Float -> Float -> Float) -> Model -> Model
-inputOperation id operation model =
-    if not model.cleared && model.lastValueNumber then
-        { model
-            | operation = operation
-            , currentValue = ""
-            , lastValue = String.fromFloat model.result
-            , append = False
-            , decimal = False
-            , lastValueNumber = False
-            , inputs = List.append model.inputs [ id ]
-        }
-
-    else
-        model
-
-
-updateCurrentValue : Model -> Int -> Model
-updateCurrentValue model number =
+updateNumbers : Int -> Model -> Model
+updateNumbers number model =
     let
-        newModel =
-            if model.append then
-                let
-                    currentValue =
-                        if model.decimal then
-                            String.concat
-                                [ model.currentValue
-                                , "."
-                                , String.fromInt number
-                                ]
+        currentValue =
+            newCurrentValue number model
 
-                        else if model.currentValue == "0" then
-                            "0"
-
-                        else
-                            String.append
-                                model.currentValue
-                                (String.fromInt number)
-                in
-                { model
-                    | currentValue = currentValue
-                    , decimal = False
-                    , cleared = False
-                    , inputs = replaceLast currentValue model.inputs
-                }
-
-            else if model.lastValueNumber then
-                let
-                    currentValue =
-                        String.fromInt number
-                in
-                { model
-                    | currentValue = currentValue
-                    , cleared = False
-                    , append = True
-                    , inputs = replaceLast currentValue model.inputs
-                }
-
-            else
-                { model
-                    | currentValue = String.fromInt number
-                    , append = True
-                    , cleared = False
-                    , inputs =
-                        List.append model.inputs
-                            [ String.fromInt number ]
-                }
+        inputs =
+            newInputs currentValue model
 
         result =
-            calculate newModel
+            model.operation
+                (parseFloat model.lastValue)
+                (parseFloat currentValue)
     in
-    { newModel
-        | result = result
-        , lastValueNumber = True
+    { model
+        | currentValue = currentValue
+        , inputs = inputs
+        , result = result
+        , append = True
+        , decimal = False
+        , cleared = False
     }
 
 
+newCurrentValue : Int -> Model -> String
+newCurrentValue number model =
+    let
+        numberString =
+            String.fromInt number
+
+        currentValue =
+            model.currentValue
+    in
+    if model.decimal then
+        currentValue ++ "." ++ numberString
+
+    else if model.append && currentValue /= "0" then
+        currentValue ++ numberString
+
+    else
+        numberString
+
+
+newInputs : String -> Model -> List String
+newInputs currentValue model =
+    if model.append || model.decimal then
+        replaceLast currentValue model.inputs
+
+    else
+        model.inputs ++ List.singleton currentValue
+
+
 replaceLast : a -> List a -> List a
-replaceLast val list =
+replaceLast replacement list =
     case list of
         [] ->
-            List.append list [ val ]
+            list ++ List.singleton replacement
 
         _ ->
-            list
-                |> List.indexedMap
-                    (\index item ->
-                        if index == (List.length list - 1) then
-                            val
+            let
+                last =
+                    List.length list - 1
 
-                        else
-                            item
-                    )
+                replace index item =
+                    if index == last then
+                        replacement
+
+                    else
+                        item
+            in
+            List.indexedMap replace list
 
 
-percentage : Model -> Model
-percentage model =
-    if model.cleared then
+add : Model -> Model
+add =
+    updateOperation "+" (+)
+
+
+subtract : Model -> Model
+subtract =
+    updateOperation "-" (-)
+
+
+multiply : Model -> Model
+multiply =
+    updateOperation "x" (*)
+
+
+divide : Model -> Model
+divide =
+    updateOperation "/" (/)
+
+
+updateOperation : String -> (Float -> Float -> Float) -> Model -> Model
+updateOperation id operation model =
+    let
+        lastValue =
+            String.fromFloat model.result
+
+        inputs =
+            model.inputs ++ List.singleton id
+
+        lastInputWasOperator =
+            String.isEmpty model.currentValue
+    in
+    if model.cleared || lastInputWasOperator then
         model
 
     else
-        let
-            currentValue =
-                parseFloat model.currentValue
-                    / 100
-                    |> String.fromFloat
-
-            newModel =
-                { model
-                    | currentValue = currentValue
-                    , inputs = replaceLast currentValue model.inputs
-                }
-        in
-        { newModel | result = calculate newModel }
-
-
-plusMinus : Model -> Model
-plusMinus model =
-    if model.cleared then
-        model
-
-    else
-        let
-            currentValue =
-                parseFloat model.currentValue
-                    * -1
-                    |> String.fromFloat
-
-            newModel =
-                { model
-                    | currentValue = currentValue
-                    , inputs = replaceLast currentValue model.inputs
-                }
-        in
-        { newModel | result = calculate newModel }
+        { model
+            | operation = operation
+            , lastValue = lastValue
+            , currentValue = ""
+            , inputs = inputs
+            , append = False
+            , decimal = False
+        }
 
 
 decimal : Model -> Model
 decimal model =
     if String.contains "." model.currentValue then
+        { model | decimal = False }
+
+    else
+        { model | decimal = True }
+
+
+percentage : Model -> Model
+percentage =
+    modifyCurrentValue (\a -> a / 100)
+
+
+plusMinus : Model -> Model
+plusMinus =
+    modifyCurrentValue (\a -> a * -1)
+
+
+modifyCurrentValue : (Float -> Float) -> Model -> Model
+modifyCurrentValue fn model =
+    if model.cleared then
         model
 
     else
+        let
+            currentValue =
+                model.currentValue
+                    |> parseFloat
+                    |> fn
+                    |> String.fromFloat
+
+            inputs =
+                replaceLast currentValue model.inputs
+
+            result =
+                model.operation
+                    (parseFloat model.lastValue)
+                    (parseFloat currentValue)
+        in
         { model
-            | decimal = True
-            , append = True
+            | currentValue = currentValue
+            , inputs = inputs
+            , result = result
         }
 
 
@@ -325,13 +325,18 @@ equal model =
         model
 
     else
+        let
+            resultString =
+                String.fromFloat model.result
+
+            inputs =
+                List.singleton resultString
+        in
         { model
-            | inputs = [ String.fromFloat model.result ]
-            , currentValue = String.fromFloat model.result
+            | inputs = inputs
             , lastValue = ""
-            , result = model.result
-            , operation = \_ y -> y
-            , append = False
+            , currentValue = resultString
+            , operation = defaultOperation
         }
 
 
@@ -339,45 +344,18 @@ clear : Model -> Model
 clear model =
     { model
         | inputs = []
-        , currentValue = "0"
         , lastValue = ""
+        , currentValue = "0"
         , result = 0
-        , operation = \_ y -> y
+        , operation = defaultOperation
         , append = False
         , cleared = True
     }
 
 
-calculate : Model -> Float
-calculate model =
-    model.operation
-        (parseFloat model.lastValue)
-        (parseFloat model.currentValue)
-
-
 parseFloat : String -> Float
-parseFloat input =
-    Maybe.withDefault 0 (String.toFloat input)
-
-
-add : Float -> Float -> Float
-add x y =
-    x + y
-
-
-subtract : Float -> Float -> Float
-subtract x y =
-    x - y
-
-
-multiply : Float -> Float -> Float
-multiply x y =
-    x * y
-
-
-divide : Float -> Float -> Float
-divide x y =
-    x / y
+parseFloat a =
+    Maybe.withDefault 0 (String.toFloat a)
 
 
 
@@ -386,9 +364,7 @@ divide x y =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.batch
-        [ Events.onResize (\values -> SetScreenSize values)
-        ]
+    Sub.batch [ Events.onResize SetScreenSize ]
 
 
 
@@ -410,10 +386,10 @@ viewPhone : Model -> Element Msg
 viewPhone model =
     let
         phoneWidth =
-            px <| calcPhoneWidth model
+            px (calcPhoneWidth model)
 
         phoneHeight =
-            px <| calcPhoneHeight model
+            px (calcPhoneHeight model)
     in
     column
         [ width phoneWidth
@@ -434,25 +410,28 @@ viewScreen model =
     in
     row
         [ width fill
-        , height <| fillPortion 1
+        , height (fillPortion 1)
         , buttonPadPadding model
-        , Background.color darkBlue
         , Border.roundEach
             { topLeft = cornerRadius
             , topRight = cornerRadius
             , bottomLeft = 0
             , bottomRight = 0
             }
+        , Background.color darkBlue
         ]
-        [ column [ width fill, height fill ]
-            [ upperScreen model
-            , lowerScreen model
+        [ column
+            [ width fill
+            , height fill
+            ]
+            [ viewUpperScreen model
+            , viewLowerScreen model
             ]
         ]
 
 
-upperScreen : Model -> Element Msg
-upperScreen model =
+viewUpperScreen : Model -> Element Msg
+viewUpperScreen model =
     let
         screenText =
             case model.inputs of
@@ -463,21 +442,24 @@ upperScreen model =
                     model.inputs
                         |> List.intersperse " "
                         |> String.concat
+
+        fontSize =
+            calcUpperScreenFontSize model
     in
     row [ width fill, height fill ]
         [ el
             [ alignRight
             , alignBottom
+            , Font.size fontSize
             , Font.color orange
-            , Font.size 50
             ]
           <|
             text screenText
         ]
 
 
-lowerScreen : Model -> Element Msg
-lowerScreen model =
+viewLowerScreen : Model -> Element Msg
+viewLowerScreen model =
     let
         screenText =
             if List.length model.inputs <= 2 then
@@ -485,13 +467,16 @@ lowerScreen model =
 
             else
                 String.fromFloat model.result
+
+        fontSize =
+            calcLowerScreenFontSize model
     in
     row [ width fill ]
         [ el
             [ alignRight
             , alignBottom
+            , Font.size fontSize
             , Font.color lightGrey
-            , Font.size 30
             ]
           <|
             text screenText
@@ -508,20 +493,20 @@ viewButtonPad model =
             row
                 [ width fill
                 , height fill
-                , spaceEvenly
+                , spacing (buttonPadSpacing model)
                 ]
     in
     row
         [ width fill
-        , height <| fillPortion 2
+        , height (fillPortion 2)
         , buttonPadPadding model
-        , Background.color darkGrey
         , Border.roundEach
             { topLeft = 0
             , topRight = 0
             , bottomLeft = cornerRadius
             , bottomRight = cornerRadius
             }
+        , Background.color darkGrey
         ]
         [ column [ width fill, height fill ]
             [ buttonRow
@@ -531,25 +516,25 @@ viewButtonPad model =
                 , buttonDivide model
                 ]
             , buttonRow
-                [ buttonNumber (Number 7) "7" Icons.seven model
-                , buttonNumber (Number 8) "8" Icons.eight model
-                , buttonNumber (Number 9) "9" Icons.nine model
+                [ buttonSeven model
+                , buttonEight model
+                , buttonNine model
                 , buttonClear model
                 ]
             , buttonRow
-                [ buttonNumber (Number 4) "4" Icons.four model
-                , buttonNumber (Number 5) "5" Icons.five model
-                , buttonNumber (Number 6) "6" Icons.six model
+                [ buttonFour model
+                , buttonFive model
+                , buttonSix model
                 , buttonPlusMinus model
                 ]
             , buttonRow
-                [ buttonNumber (Number 1) "1" Icons.one model
-                , buttonNumber (Number 2) "2" Icons.two model
-                , buttonNumber (Number 3) "3" Icons.three model
+                [ buttonOne model
+                , buttonTwo model
+                , buttonThree model
                 , buttonPercent model
                 ]
             , buttonRow
-                [ buttonNumber (Number 0) "0" Icons.zero model
+                [ buttonZero model
                 , buttonDecimal model
                 , buttonEquals model
                 ]
@@ -557,62 +542,128 @@ viewButtonPad model =
         ]
 
 
+buttonZero : Model -> Element Msg
+buttonZero =
+    buttonNumber (Number 0) "0" Icons.zero
+
+
+buttonOne : Model -> Element Msg
+buttonOne =
+    buttonNumber (Number 1) "1" Icons.one
+
+
+buttonTwo : Model -> Element Msg
+buttonTwo =
+    buttonNumber (Number 2) "2" Icons.two
+
+
+buttonThree : Model -> Element Msg
+buttonThree =
+    buttonNumber (Number 3) "3" Icons.three
+
+
+buttonFour : Model -> Element Msg
+buttonFour =
+    buttonNumber (Number 4) "4" Icons.four
+
+
+buttonFive : Model -> Element Msg
+buttonFive =
+    buttonNumber (Number 5) "5" Icons.five
+
+
+buttonSix : Model -> Element Msg
+buttonSix =
+    buttonNumber (Number 6) "6" Icons.six
+
+
+buttonSeven : Model -> Element Msg
+buttonSeven =
+    buttonNumber (Number 7) "7" Icons.seven
+
+
+buttonEight : Model -> Element Msg
+buttonEight =
+    buttonNumber (Number 8) "8" Icons.eight
+
+
+buttonNine : Model -> Element Msg
+buttonNine =
+    buttonNumber (Number 9) "9" Icons.nine
+
+
+buttonAdd : Model -> Element Msg
 buttonAdd =
     buttonSymbolCircle Add "+" Icons.add
 
 
+buttonSubtract : Model -> Element Msg
 buttonSubtract =
     buttonSymbolCircle Subtract "-" Icons.subtract
 
 
+buttonMultiply : Model -> Element Msg
 buttonMultiply =
     buttonSymbolCircle Multiply "x" Icons.multiply
 
 
+buttonDivide : Model -> Element Msg
 buttonDivide =
     buttonSymbolCircle Divide "/" Icons.divide
 
 
+buttonPlusMinus : Model -> Element Msg
 buttonPlusMinus =
     buttonSymbolCircle PlusMinus "+/-" Icons.plusMinus
 
 
+buttonPercent : Model -> Element Msg
 buttonPercent =
     buttonSymbolCircle Percentage "%" Icons.percentage
 
 
+buttonDecimal : Model -> Element Msg
 buttonDecimal =
     buttonSymbolCircle Decimal "." Icons.decimal
 
 
+buttonEquals : Model -> Element Msg
 buttonEquals =
     buttonSymbolPill Equals "=" Icons.equals
 
 
+buttonClear : Model -> Element Msg
 buttonClear =
     buttonSymbolCircle Clear "c" Icons.clear
 
 
-
---buttonSymbolCircle : Msg -> String -> Svg Msg -> Model -> Element Msg
-
-
+buttonSymbolCircle :
+    Msg
+    -> String
+    -> (List (VirtualDom.Attribute Msg) -> Svg Msg)
+    -> Model
+    -> Element Msg
 buttonSymbolCircle =
     buttonSymbol 1
 
 
-
---buttonSymbolPill : Msg -> String -> Svg Msg -> Model -> Element Msg
-
-
+buttonSymbolPill :
+    Msg
+    -> String
+    -> (List (VirtualDom.Attribute Msg) -> Svg Msg)
+    -> Model
+    -> Element Msg
 buttonSymbolPill =
     buttonSymbol 2
 
 
-
---buttonSymbol : Int -> Msg -> String -> Svg Msg -> Model -> Element Msg
-
-
+buttonSymbol :
+    Int
+    -> Msg
+    -> String
+    -> (List (VirtualDom.Attribute Msg) -> Svg Msg)
+    -> Model
+    -> Element Msg
 buttonSymbol width msg id icon model =
     let
         buttonPressed =
@@ -636,10 +687,12 @@ buttonSymbol width msg id icon model =
         model
 
 
-
---buttonNumber : Msg -> String -> Svg Msg -> Model -> Element Msg
-
-
+buttonNumber :
+    Msg
+    -> String
+    -> (List (VirtualDom.Attribute Msg) -> Svg Msg)
+    -> Model
+    -> Element Msg
 buttonNumber msg id icon model =
     let
         buttonPressed =
@@ -687,82 +740,74 @@ button ui model =
             calcButtonRadius model
 
         buttonDiameter =
-            buttonRadius * 2
+            calcButtonDiameter model
 
         buttonIconHeight =
             calcIconHeight model
 
         buttonWidth =
             if ui.width == 1 then
-                px <| buttonDiameter
+                buttonDiameter
 
             else
-                fill
+                buttonDiameter
+                    * ui.width
+                    + buttonPadSpacing model
+                    * (ui.width - 1)
 
         buttonHeight =
-            px buttonDiameter
+            buttonDiameter
+
+        fontColor =
+            toSvgColor ui.fontColor
     in
-    column
-        [ width <| fillPortion ui.width
-        , height buttonHeight
-        ]
-        [ Input.button
-            [ width buttonWidth
-            , height buttonHeight
-            , centerX
-            , centerY
-            , Background.color ui.backgroundColor
-            , Border.rounded buttonRadius
-            , Border.shadow
-                { offset = ( 0, 2 )
-                , size = 1
-                , blur = 1
-                , color = black
-                }
-            , focused []
-            , onMouseDown <| PressButton ui.id
-            , onMouseUp <| UnpressButton ui.id
-            ]
-            { onPress = Just ui.msg
-            , label =
-                ui.icon
-                    [ Svg.Attributes.fill (toSvgColor ui.fontColor)
-                    , Svg.Attributes.height (String.fromInt buttonIconHeight)
-                    ]
-                    |> html
-                    |> el [ centerX, centerY ]
+    Input.button
+        [ width (px buttonWidth)
+        , height (px buttonHeight)
+        , centerX
+        , centerY
+        , Border.rounded buttonRadius
+        , Background.color ui.backgroundColor
+        , Border.shadow
+            { offset = ( 0, 2 )
+            , size = 1
+            , blur = 1
+            , color = black
             }
+        , focused []
+        , onMouseDown <| PressButton ui.id
+        , onMouseUp <| UnpressButton ui.id
         ]
+        { onPress = Just ui.msg
+        , label =
+            el [ centerX, centerY ] <|
+                html <|
+                    ui.icon
+                        [ Svg.Attributes.fill fontColor
+                        , Svg.Attributes.height
+                            (String.fromInt buttonIconHeight)
+                        ]
+        }
 
 
 toSvgColor : Color -> String
 toSvgColor color =
     let
-        rgbRecord =
+        to255 accessor =
             toRgb color
-
-        redVal =
-            String.fromFloat <|
-                rgbRecord.red
-                    * 255
-
-        greenVal =
-            String.fromFloat <|
-                rgbRecord.green
-                    * 255
-
-        blueVal =
-            String.fromFloat <|
-                rgbRecord.blue
-                    * 255
+                |> accessor
+                |> (*) 255
+                |> String.fromFloat
     in
-    "rgb("
-        ++ redVal
-        ++ ","
-        ++ greenVal
-        ++ ","
-        ++ blueVal
-        ++ ")"
+    String.concat
+        [ "rgb("
+        , to255 .red
+        , ","
+        , to255 .green
+        , ","
+        , to255 .blue
+        , ")"
+        ]
 
 
 calcPhoneHeight : Model -> Int
@@ -796,19 +841,75 @@ calcButtonRadius =
     scaleFromHeight 0.041
 
 
+calcButtonDiameter : Model -> Int
+calcButtonDiameter =
+    calcButtonRadius >> (*) 2
+
+
 calcIconHeight : Model -> Int
 calcIconHeight =
     calcButtonRadius
+
+
+calcUpperScreenFontSize : Model -> Int
+calcUpperScreenFontSize =
+    scaleFromHeight 0.07
+
+
+calcLowerScreenFontSize : Model -> Int
+calcLowerScreenFontSize =
+    scaleFromHeight 0.05
+
+
+buttonPadSpacing : Model -> Int
+buttonPadSpacing model =
+    let
+        phoneWidth =
+            calcPhoneWidth model
+
+        buttonDiameter =
+            calcButtonDiameter model
+
+        padding =
+            calcButtonPadPaddingHorizontal model
+
+        gridWidth =
+            4
+
+        numSpaces =
+            gridWidth - 1
+
+        totalSpacing =
+            phoneWidth
+                - padding
+                * 2
+                - buttonDiameter
+                * gridWidth
+
+        singleSpacing =
+            round (toFloat totalSpacing / numSpaces)
+    in
+    singleSpacing
+
+
+calcButtonPadPaddingHorizontal : Model -> Int
+calcButtonPadPaddingHorizontal =
+    scaleFromHeight 0.023
+
+
+calcButtonPadPaddingVertical : Model -> Int
+calcButtonPadPaddingVertical =
+    scaleFromHeight 0.059
 
 
 buttonPadPadding : Model -> Attribute msg
 buttonPadPadding model =
     let
         topBottom =
-            scaleFromHeight 0.059 model
+            calcButtonPadPaddingVertical model
 
         leftRight =
-            scaleFromHeight 0.023 model
+            calcButtonPadPaddingHorizontal model
     in
     paddingEach
         { top = topBottom
@@ -828,24 +929,24 @@ darkGrey =
     rgb255 78 91 116
 
 
-darkBlue : Color
-darkBlue =
-    rgb255 28 46 82
-
-
 lightGrey : Color
 lightGrey =
     rgb255 229 229 229
 
 
-orange : Color
-orange =
-    rgb255 219 144 0
-
-
 white : Color
 white =
     rgb255 255 255 255
+
+
+darkBlue : Color
+darkBlue =
+    rgb255 28 46 82
+
+
+orange : Color
+orange =
+    rgb255 219 144 0
 
 
 fontFamily : List Font.Font
