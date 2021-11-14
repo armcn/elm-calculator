@@ -1,6 +1,6 @@
 {
-  "main.js": "/elm-calculator/static/js/main.ea8d01f7.chunk.js",
-  "main.js.map": "/elm-calculator/static/js/main.ea8d01f7.chunk.js.map",
+  "main.js": "/elm-calculator/static/js/main.6bd272e7.chunk.js",
+  "main.js.map": "/elm-calculator/static/js/main.6bd272e7.chunk.js.map",
   "runtime~main.js": "/elm-calculator/static/js/runtime~main.830ee8fe.js",
   "runtime~main.js.map": "/elm-calculator/static/js/runtime~main.830ee8fe.js.map",
   "vendors~main.js": "/elm-calculator/static/js/vendors~main.0b49ec49.chunk.js",
@@ -9,5 +9,5 @@
   "favicon.ico": "/elm-calculator/favicon.ico",
   "index.html": "/elm-calculator/index.html",
   "manifest.json": "/elm-calculator/manifest.json",
-  "precache-manifest.5690fbc5b9dd09e7fa11400c64dace99.js": "/elm-calculator/precache-manifest.5690fbc5b9dd09e7fa11400c64dace99.js"
+  "precache-manifest.823c2979bf952fa735b9b9d7035fa4e3.js": "/elm-calculator/precache-manifest.823c2979bf952fa735b9b9d7035fa4e3.js"
 }
