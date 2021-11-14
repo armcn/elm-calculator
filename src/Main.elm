@@ -10,6 +10,7 @@ import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html)
 import Icons
+import Round
 import Svg exposing (Svg)
 import Svg.Attributes
 import VirtualDom
@@ -35,6 +36,7 @@ type alias Model =
     { screenSize : ScreenSize
     , button : Button
     , inputs : List String
+    , display : String
     , lastValue : String
     , currentValue : String
     , operation : Float -> Float -> Float
@@ -56,6 +58,7 @@ init flags =
     ( { screenSize = ScreenSize flags.width flags.height
       , button = Button "" False
       , inputs = []
+      , display = "0"
       , lastValue = ""
       , currentValue = "0"
       , operation = defaultOperation
@@ -162,19 +165,27 @@ updateNumbers number model =
         inputs =
             newInputs currentValue model
 
+        display =
+            newDisplay inputs
+
         result =
             model.operation
                 (parseFloat model.lastValue)
                 (parseFloat currentValue)
     in
-    { model
-        | currentValue = currentValue
-        , inputs = inputs
-        , result = result
-        , append = True
-        , decimal = False
-        , cleared = False
-    }
+    if displayIsTooLong display then
+        model
+
+    else
+        { model
+            | currentValue = currentValue
+            , inputs = inputs
+            , display = display
+            , result = result
+            , append = True
+            , decimal = False
+            , cleared = False
+        }
 
 
 newCurrentValue : Int -> Model -> String
@@ -203,6 +214,23 @@ newInputs currentValue model =
 
     else
         model.inputs ++ List.singleton currentValue
+
+
+newDisplay : List String -> String
+newDisplay inputs =
+    case inputs of
+        [] ->
+            "0"
+
+        _ ->
+            inputs
+                |> List.intersperse " "
+                |> String.concat
+
+
+displayIsTooLong : String -> Bool
+displayIsTooLong display =
+    String.length display > 11
 
 
 replaceLast : a -> List a -> List a
@@ -255,10 +283,17 @@ updateOperation id operation model =
         inputs =
             model.inputs ++ List.singleton id
 
+        display =
+            newDisplay inputs
+
         lastInputWasOperator =
             String.isEmpty model.currentValue
     in
-    if model.cleared || lastInputWasOperator then
+    if
+        model.cleared
+            || lastInputWasOperator
+            || displayIsTooLong display
+    then
         model
 
     else
@@ -267,6 +302,7 @@ updateOperation id operation model =
             , lastValue = lastValue
             , currentValue = ""
             , inputs = inputs
+            , display = display
             , append = False
             , decimal = False
         }
@@ -307,6 +343,9 @@ modifyCurrentValue fn model =
             inputs =
                 replaceLast currentValue model.inputs
 
+            display =
+                newDisplay inputs
+
             result =
                 model.operation
                     (parseFloat model.lastValue)
@@ -315,6 +354,7 @@ modifyCurrentValue fn model =
         { model
             | currentValue = currentValue
             , inputs = inputs
+            , display = display
             , result = result
         }
 
@@ -327,23 +367,38 @@ equal model =
     else
         let
             resultString =
-                String.fromFloat model.result
+                roundResult model
 
             inputs =
                 List.singleton resultString
         in
         { model
             | inputs = inputs
+            , display = resultString
             , lastValue = ""
             , currentValue = resultString
             , operation = defaultOperation
         }
 
 
+roundResult : Model -> String
+roundResult model =
+    let
+        rounded =
+            Round.round 2 model.result
+    in
+    if String.contains ".00" rounded then
+        String.fromFloat model.result
+
+    else
+        rounded
+
+
 clear : Model -> Model
 clear model =
     { model
         | inputs = []
+        , display = "0"
         , lastValue = ""
         , currentValue = "0"
         , result = 0
@@ -411,7 +466,7 @@ viewScreen model =
     row
         [ width fill
         , height (fillPortion 1)
-        , buttonPadPadding model
+        , buttonAreaPadding model
         , Border.roundEach
             { topLeft = cornerRadius
             , topRight = cornerRadius
@@ -433,16 +488,6 @@ viewScreen model =
 viewUpperScreen : Model -> Element Msg
 viewUpperScreen model =
     let
-        screenText =
-            case model.inputs of
-                [] ->
-                    "0"
-
-                _ ->
-                    model.inputs
-                        |> List.intersperse " "
-                        |> String.concat
-
         fontSize =
             calcUpperScreenFontSize model
     in
@@ -454,7 +499,7 @@ viewUpperScreen model =
             , Font.color orange
             ]
           <|
-            text screenText
+            text model.display
         ]
 
 
@@ -466,7 +511,7 @@ viewLowerScreen model =
                 ""
 
             else
-                String.fromFloat model.result
+                roundResult model
 
         fontSize =
             calcLowerScreenFontSize model
@@ -499,7 +544,7 @@ viewButtonPad model =
     row
         [ width fill
         , height (fillPortion 2)
-        , buttonPadPadding model
+        , buttonAreaPadding model
         , Border.roundEach
             { topLeft = 0
             , topRight = 0
@@ -540,6 +585,37 @@ viewButtonPad model =
                 ]
             ]
         ]
+
+
+buttonPadSpacing : Model -> Int
+buttonPadSpacing model =
+    let
+        phoneWidth =
+            calcPhoneWidth model
+
+        buttonDiameter =
+            calcButtonDiameter model
+
+        padding =
+            calcButtonAreaPaddingX model
+
+        gridWidth =
+            4
+
+        numSpaces =
+            gridWidth - 1
+
+        totalSpacing =
+            phoneWidth
+                - padding
+                * 2
+                - buttonDiameter
+                * gridWidth
+
+        singleSpacing =
+            round (toFloat totalSpacing / numSpaces)
+    in
+    singleSpacing
 
 
 buttonZero : Model -> Element Msg
@@ -775,8 +851,8 @@ button ui model =
             , color = black
             }
         , focused []
-        , onMouseDown <| PressButton ui.id
-        , onMouseUp <| UnpressButton ui.id
+        , onMouseDown (PressButton ui.id)
+        , onMouseUp (UnpressButton ui.id)
         ]
         { onPress = Just ui.msg
         , label =
@@ -812,23 +888,25 @@ toSvgColor color =
 
 calcPhoneHeight : Model -> Int
 calcPhoneHeight model =
-    model.screenSize.height
-        |> toFloat
-        |> (*) 0.9
-        |> round
-
-
-scaleFromHeight : Float -> Model -> Int
-scaleFromHeight scale model =
-    calcPhoneHeight model
-        |> toFloat
-        |> (*) scale
-        |> round
+    scale 0.9 model.screenSize.height
 
 
 calcPhoneWidth : Model -> Int
 calcPhoneWidth =
     scaleFromHeight 0.46
+
+
+scaleFromHeight : Float -> Model -> Int
+scaleFromHeight factor model =
+    scale factor (calcPhoneHeight model)
+
+
+scale : Float -> Int -> Int
+scale factor number =
+    number
+        |> toFloat
+        |> (*) factor
+        |> round
 
 
 calcCornerRadius : Model -> Int
@@ -838,7 +916,7 @@ calcCornerRadius =
 
 calcButtonRadius : Model -> Int
 calcButtonRadius =
-    scaleFromHeight 0.041
+    scaleFromHeight 0.038
 
 
 calcButtonDiameter : Model -> Int
@@ -848,7 +926,7 @@ calcButtonDiameter =
 
 calcIconHeight : Model -> Int
 calcIconHeight =
-    calcButtonRadius
+    calcButtonDiameter >> scale (2 / 3)
 
 
 calcUpperScreenFontSize : Model -> Int
@@ -861,55 +939,14 @@ calcLowerScreenFontSize =
     scaleFromHeight 0.05
 
 
-buttonPadSpacing : Model -> Int
-buttonPadSpacing model =
-    let
-        phoneWidth =
-            calcPhoneWidth model
-
-        buttonDiameter =
-            calcButtonDiameter model
-
-        padding =
-            calcButtonPadPaddingHorizontal model
-
-        gridWidth =
-            4
-
-        numSpaces =
-            gridWidth - 1
-
-        totalSpacing =
-            phoneWidth
-                - padding
-                * 2
-                - buttonDiameter
-                * gridWidth
-
-        singleSpacing =
-            round (toFloat totalSpacing / numSpaces)
-    in
-    singleSpacing
-
-
-calcButtonPadPaddingHorizontal : Model -> Int
-calcButtonPadPaddingHorizontal =
-    scaleFromHeight 0.023
-
-
-calcButtonPadPaddingVertical : Model -> Int
-calcButtonPadPaddingVertical =
-    scaleFromHeight 0.059
-
-
-buttonPadPadding : Model -> Attribute msg
-buttonPadPadding model =
+buttonAreaPadding : Model -> Attribute msg
+buttonAreaPadding model =
     let
         topBottom =
-            calcButtonPadPaddingVertical model
+            calcButtonAreaPaddingY model
 
         leftRight =
-            calcButtonPadPaddingHorizontal model
+            calcButtonAreaPaddingX model
     in
     paddingEach
         { top = topBottom
@@ -917,6 +954,16 @@ buttonPadPadding model =
         , left = leftRight
         , right = leftRight
         }
+
+
+calcButtonAreaPaddingX : Model -> Int
+calcButtonAreaPaddingX =
+    scaleFromHeight 0.032
+
+
+calcButtonAreaPaddingY : Model -> Int
+calcButtonAreaPaddingY =
+    scaleFromHeight 0.076
 
 
 black : Color

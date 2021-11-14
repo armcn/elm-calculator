@@ -10,10 +10,10 @@ suite : Test
 suite =
     let
         initModel =
-            init (Flags 1 1) |> Tuple.first
+            Tuple.first <| init (Flags 1 1)
 
         updateModel msg model =
-            update msg model |> Tuple.first
+            Tuple.first <| update msg model
 
         button =
             intRange 0 9
@@ -35,7 +35,7 @@ suite =
                 ]
 
         screenState model =
-            { inputs = model.inputs
+            { display = model.display
             , result = model.result
             }
     in
@@ -48,50 +48,46 @@ suite =
                         |> updateModel (Number 0)
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton "0"
+                            { display = "0"
                             , result = 0
                             }
-            , fuzz button "a number" <|
+            , fuzz button "just a number" <|
                 \a ->
                     initModel
                         |> updateModel (Number a)
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton (String.fromInt a)
+                            { display = String.fromInt a
                             , result = toFloat a
                             }
-            , fuzz symbol "a symbol" <|
+            , fuzz symbol "just a symbol" <|
                 \a ->
                     initModel
                         |> updateModel a
                         |> screenState
                         |> Expect.equal
-                            { inputs = []
+                            { display = "0"
                             , result = 0
                             }
             , fuzz2 nonZeroButton button "a multi-digit number" <|
                 \a b ->
                     let
                         resultString =
-                            String.append
-                                (String.fromInt a)
-                                (String.fromInt b)
+                            String.fromInt a ++ String.fromInt b
                     in
                     initModel
                         |> updateModel (Number a)
                         |> updateModel (Number b)
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
                             }
             , fuzz nonZeroButton "a number with trailing zeros" <|
                 \a ->
                     let
                         resultString =
-                            String.append
-                                (String.fromInt a)
-                                "00"
+                            String.fromInt a ++ "00"
                     in
                     initModel
                         |> updateModel (Number a)
@@ -99,7 +95,7 @@ suite =
                         |> updateModel (Number 0)
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
                             }
             , fuzz3 button button button "a decimal number can't have multiple decimals" <|
@@ -121,21 +117,21 @@ suite =
                         |> updateModel (Number c)
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
                             }
             , fuzz button "clicking decimal button before a number" <|
                 \a ->
                     let
                         resultString =
-                            String.append "0." (String.fromInt a)
+                            "0." ++ String.fromInt a
                     in
                     initModel
                         |> updateModel Decimal
                         |> updateModel (Number a)
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
                             }
             , fuzz2 button button "a decimal starting with zero" <|
@@ -155,7 +151,7 @@ suite =
                         |> updateModel (Number b)
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
                             }
             , fuzz3 nonZeroButton button button "a decimal starting with a non-zero" <|
@@ -176,16 +172,14 @@ suite =
                         |> updateModel (Number c)
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
                             }
             , fuzz button "a decimal with trailing zeros" <|
                 \a ->
                     let
                         resultString =
-                            String.append
-                                (String.fromInt a)
-                                ".00"
+                            String.fromInt a ++ ".00"
                     in
                     initModel
                         |> updateModel (Number a)
@@ -194,7 +188,7 @@ suite =
                         |> updateModel (Number 0)
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
                             }
             , test "a number and a symbol" <|
@@ -204,7 +198,7 @@ suite =
                         |> updateModel Add
                         |> screenState
                         |> Expect.equal
-                            { inputs = [ "1", "+" ]
+                            { display = "1 +"
                             , result = 1
                             }
             , test "a number, symbol, and number" <|
@@ -215,7 +209,7 @@ suite =
                         |> updateModel (Number 2)
                         |> screenState
                         |> Expect.equal
-                            { inputs = [ "1", "+", "2" ]
+                            { display = "1 + 2"
                             , result = 3
                             }
             , test "multiple numbers and symbols" <|
@@ -224,16 +218,12 @@ suite =
                         |> updateModel (Number 1)
                         |> updateModel Add
                         |> updateModel (Number 2)
-                        |> updateModel Decimal
-                        |> updateModel (Number 1)
                         |> updateModel Subtract
-                        |> updateModel (Number 0)
-                        |> updateModel Decimal
                         |> updateModel (Number 9)
                         |> screenState
                         |> Expect.equal
-                            { inputs = [ "1", "+", "2.1", "-", "0.9" ]
-                            , result = 2.2
+                            { display = "1 + 2 - 9"
+                            , result = -6
                             }
             , fuzz symbol "symbol before any numbers does nothing" <|
                 \a ->
@@ -241,7 +231,7 @@ suite =
                         |> updateModel a
                         |> screenState
                         |> Expect.equal
-                            { inputs = []
+                            { display = "0"
                             , result = 0
                             }
             , fuzz button "plus/minus turns positive numbers negative" <|
@@ -255,7 +245,7 @@ suite =
                         |> updateModel PlusMinus
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
                             }
             , fuzz button "plus/minus turns negative numbers positive" <|
@@ -269,7 +259,7 @@ suite =
                         |> updateModel PlusMinus
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
                             }
             , fuzz button "percentage divides numbers by 100" <|
@@ -283,36 +273,8 @@ suite =
                         |> updateModel Percentage
                         |> screenState
                         |> Expect.equal
-                            { inputs = List.singleton resultString
+                            { display = resultString
                             , result = parseFloat resultString
-                            }
-            , test "chain of inputs produces correct screen state" <|
-                \_ ->
-                    initModel
-                        |> updateModel (Number 0)
-                        |> updateModel (Number 0)
-                        |> updateModel Add
-                        |> updateModel (Number 2)
-                        |> updateModel Decimal
-                        |> updateModel (Number 5)
-                        |> updateModel PlusMinus
-                        |> updateModel Multiply
-                        |> updateModel (Number 10)
-                        |> updateModel Percentage
-                        |> updateModel Subtract
-                        |> updateModel (Number 1)
-                        |> screenState
-                        |> Expect.equal
-                            { inputs =
-                                [ "0"
-                                , "+"
-                                , "-2.5"
-                                , "x"
-                                , "0.1"
-                                , "-"
-                                , "1"
-                                ]
-                            , result = -1.25
                             }
             , test "equals overwrites inputs with result" <|
                 \_ ->
@@ -323,7 +285,7 @@ suite =
                         |> updateModel Equals
                         |> screenState
                         |> Expect.equal
-                            { inputs = [ "3" ]
+                            { display = "3"
                             , result = 3
                             }
             , fuzz3 button symbol button "clear returns model to initial state" <|
@@ -335,5 +297,15 @@ suite =
                         |> updateModel Clear
                         |> screenState
                         |> Expect.equal (screenState initModel)
+            , test "display is less than 11 characters long" <|
+                \_ ->
+                    initModel
+                        |> updateModel (Number 1)
+                        |> updateModel Divide
+                        |> updateModel (Number 3)
+                        |> updateModel Equals
+                        |> .display
+                        |> (\a -> String.length a < 11)
+                        |> Expect.true "Less than 11 characters"
             ]
         ]
